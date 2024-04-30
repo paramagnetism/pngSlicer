@@ -1,5 +1,4 @@
-#!/usr/bin/python
-
+# -*- coding: utf-8 -*-
 """
 The MIT License (MIT)
 
@@ -24,7 +23,7 @@ THE SOFTWARE.
 
 from Model3D import STLModel, Vector3, Normal
 from svgwrite import Drawing, rgb
-import sys, cairosvg, IPython, time
+import sys, IPython, time
 from PIL import Image, ImageDraw
 import numpy as np
 from sklearn.neighbors import KDTree
@@ -58,11 +57,11 @@ def convertToPixels(vSet, width_multiplier, height_multiplier, object_center, ce
 
 
 def slice_file(resolution, f=None, scale_model = None,width_px = None, height_px = None, width_printer = None, height_printer = None):
-
+    # slice_file(0.003, args.file,        0.01       ,       2000,         2000,       75    ,   75 )
 	print("Status: Loading File.")
 
-	width_multiplier = calculateMultiplier(width_px, width_printer) #converstion from mm to pixels
-	height_multiplier = calculateMultiplier(height_px, height_printer) #conversion from mm to pixels
+	width_multiplier = width_px/width_printer #converstion from mm to pixels
+	height_multiplier = height_px/height_printer #conversion from mm to pixels
 
 	model = STLModel(f)
 	stats = model.stats()
@@ -110,7 +109,8 @@ def slice_file(resolution, f=None, scale_model = None,width_px = None, height_px
 	slices = np.linspace(0.001, stats['extents']['z']['upper']-0.001, int(stats['extents']['z']['upper']/(mmToinch(resolution)))+1)
 
 	tic = time.time()
-
+	model.sort()
+    
 	for slice in range(len(slices)):#1, int(stats['extents']['z']['upper']), int(interval)):
 		dwg = Drawing('outputs/svg/'+str(slice)+'.svg', profile='full')
 		pairs = model.slice_at_z(slices[slice])
@@ -119,7 +119,6 @@ def slice_file(resolution, f=None, scale_model = None,width_px = None, height_px
 		#dwg.attribs['viewBox']= str(model.xmin)+" "+str(model.ymin)+" "+ str(model.xmax)+" "+str(model.ymax)
 		#dwg.save()
 		#cairosvg.svg2png(url = 'outputs/svg/'+str(targetz)+'.svg' , write_to='outputs/png/'+str(targetz)+'.png')
-
 
 		#Now process vertices
 		a = np.asarray(pairs)
@@ -172,7 +171,6 @@ def slice_file(resolution, f=None, scale_model = None,width_px = None, height_px
 				draw.polygon(set, fill = (255, 255, 255))
 		img.save('outputs/png_filled/'+str(slice)+'.png', 'PNG')
 
-	print("Status: Finished Outputting Slices")
 	print('Time: ', time.time()-tic)
 
 if __name__ == '__main__':
@@ -185,26 +183,26 @@ if __name__ == '__main__':
 						help='File to be sliced',
 						nargs='?',
 						# default='models/cube.STL',
-						default='models/yodabust.stl',
+						default='C:\AAAWeichen\Mold (important!)\Mold post model stl\Mould insert_F_standard_V2.stl',
+                        #default='C:\AAAWeichen\Mold (important!)\Mold original stl\Handle Latch V3 urgent.stl',
 						type=argparse.FileType('rb'))
 	parser.add_argument('-s', '--scale', type=float,
-						default=0.05,
+						default=0.01,
 						help='Scale multiplier of the model')
 	parser.add_argument('-r', '--resolution', type=float,
-						default=3.,
+						default=0.003,   
 						help='The Z-Axis resolution of the printer, in mms')
 	parser.add_argument('-wi', '--width', type=int,
-						default=2000,
+						default=2000,  
 						help='PNG image width')
-	parser.add_argument('-he', '--height', type=int,
+	parser.add_argument('-he', '--height', type=int, 
 						default=2000,
 						help='PNG image height')
 	parser.add_argument('-heP', '--height_printer', type=int,
-						default=200,
+						default=75,
 						help='actual height of the 3d printers bed size, in mms')
 	parser.add_argument('-wiP', '--width_printer', type=int,
-						default=200,
+						default=75,
 						help='actual width of the 3d printers bed size, in mms')
-
 	args = parser.parse_args()
-	slice_file(args.resolution, args.file, args.scale, args.width, args.height, args.width_printer, args.height_printer)
+	ret = slice_file(args.resolution, args.file, args.scale, args.width, args.height, args.width_printer, args.height_printer)

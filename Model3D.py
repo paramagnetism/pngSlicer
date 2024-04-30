@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from hashlib import md5
 from struct import unpack
 from math import fabs, sqrt
@@ -25,9 +26,18 @@ class Vector3(object):
 	def __sub__(self, other):
 		'''Return the difference between two points as a new Vector3'''
 		return Vector3(self.x - other.x, self.y - other.y, self.z - other.z)
+    
+	def __lt__(self, other):
+		'''Return the if z is smaller than'''
+		return (self.z < other.z)
 
+	def __gt__(self, other):
+		'''Return the difference between two points as a new Vector3'''
+		return (self.z > other.z)
+    
 	def __str__(self):
 		return '(%f, %f, %f)' % (self.x, self.y, self.z)
+    
 
 	def __eq__(self, other):
 		if other == None:
@@ -56,20 +66,13 @@ class Normal(Vector3):
 	'''Class for a 3D Normal Vector in Cartesian Space'''
 
 	def __init__(self, dx, dy, dz):
-		dx = float(dx)
-		dy = float(dy)
-		dz = float(dz)
-
-		l = sqrt(dx*dx+dy*dy+dz*dz)
-
-		if l == 0.0:
+		if sqrt(dx*dx+dy*dy+dz*dz) == 0.0:
 			raise ValueError("Length of Vector is 0")
-
 		super(Normal, self).__init__(dx, dy, dz)
-
+'''
 	def __str__(self):
 		return 'Normal: (%f, %f, %f)' % (dx, dy, dz)
-
+'''   
 class Edge(object):
 	'''Class representing the edge of a Facet, a line segment between two
 	vertices.'''
@@ -84,16 +87,15 @@ class Edge(object):
 		self.p = [start, end]
 		self.refs = []
 		if f:
-			assert isinstance(f, Facet), "Reference is not a Facet."
+			assert isinstance(f, Facet), "Reference is not a Facet."   
 			self.refs.append(f)
 
 	def __eq__(self, other):
 		'''If both self and other contain the same endpoints, they're equal,
 		irrespective of the direction of the edge.'''
 		assert isinstance(Edge, other), "Trying to compare a non-Edge."
-		if self.p[0] == other.p[0] and self.p[1] == other.p[1]:
-			return True
-		if self.p[0] == other.p[1] and self.p[1] == other.p[0]:
+		if (self.p[0] == other.p[0] and self.p[1] == other.p[1]) \
+            or (self.p[0] == other.p[1] and self.p[1] == other.p[0]):
 			return True
 		return False
 
@@ -121,14 +123,14 @@ class Edge(object):
 
 	def contains(self, point):
 		'''Checks if a Vertex lies on the egde.
-
+   
 		point -- Vertex to test.
 
 		Returns True if the point is on the Edge, false otherwise.'''
 		d1 = self.p[1] - self.p[0]
 		d2 = point - self.p[0]
 		xp = d1.cross(d2)
-		if xp.length() == 0.0 and (0.0 <= d2.length() <= 1.0):
+		if xp.length() == 0.0 and 0.0 <= d2.length() <= d1.length():
 			return True
 		return False
 
@@ -137,15 +139,15 @@ class Edge(object):
 		assert isinstance(f, Facet), "Reference is not a Facet."
 		self.refs.append(f)
 
-	def key(self):
-		'''Return a unique key for the edge so we can put it in a
-		dictionary. The key is derived from the keys of the Edge's
-		Vertices.'''
-		k1 = self.p[0].key()
-		k2 = self.p[1].key()
-		if k2 < k1:
-			return k2+k1
-		return k1+k2
+#   def key(self):
+#		'''Return a unique key for the edge so we can put it in a
+#		dictionary. The key is derived from the keys of the Edge's
+#		Vertices.'''
+#		k1 = self.p[0].key()
+#		k2 = self.p[1].key()
+#		if k2 < k1:
+#			return k2+k1
+#		return k1+k2
 
 class Triangle(object):
 	'''Class to represent a triangle in 3D Space.'''
@@ -155,16 +157,10 @@ class Triangle(object):
 		assert isinstance(p1, Vector3), "p1 is not a Vector3"
 		assert isinstance(p2, Vector3), "p2 is not a Vector3"
 		assert isinstance(p3, Vector3), "p3 is not a Vector3"
-
-		if p1 == p2 or p1 == p3:
-			raise ValueError("Degenerate Facet; Coincident Points")
-
-		edge = Edge(p1, p2)
-		if edge.contains(p3):
+        
+		if (p1-p2).cross(p1-p3).length() == 0: 
 			raise ValueError("Degenerate Facet; Colinear Points")
-
-		del edge
-
+        		
 		self.vertices = [p1, p2, p3]
 
 		if isinstance(norm, Normal):
@@ -190,23 +186,20 @@ class Triangle(object):
 		# ( y ) = n*V + A 
 		# (240)
 
-		refz = targetz - A[2]
+		# refz = targetz - A[2]
 
 		# ( x  )
 		# ( y  ) = nV
 		# (refz)
 
-		n = refz/V[2]
+		n = (targetz - A[2])/V[2]
 
-		coords = (n * V[0] + A[0], n * V[1] + A[1])
-
-		return (coords)
+		return (n * V[0] + A[0], n * V[1] + A[1])
 
 	#@profile
 	def find_interpolated_points_at_z(self, targetz):
 		pair = []
-
-		if (self.vertices[0].z > targetz and self.vertices[1].z < targetz) or (self.vertices[0].z < targetz and self.vertices[1].z > targetz):
+		if (self.vertices[0].z - targetz)*(self.vertices[1].z - targetz) < 0:
 			# Calculate the coordinates of one segment at z = targetz (between v[0] and v[1])
 
 			A = (self.vertices[0].x, self.vertices[0].y, self.vertices[0].z)
@@ -214,7 +207,7 @@ class Triangle(object):
 
 			pair.append(self.findInterpolatedPoint(A, B, targetz))
 
-		if (self.vertices[0].z > targetz and self.vertices[2].z < targetz) or (self.vertices[0].z < targetz and self.vertices[2].z > targetz):
+		if (self.vertices[0].z -targetz)*(self.vertices[2].z - targetz) < 0:
 			# Calculate the coordinates of one segment at z = targetz (between v[0] and v[2])
 
 			A = (self.vertices[0].x, self.vertices[0].y, self.vertices[0].z)
@@ -222,21 +215,17 @@ class Triangle(object):
 
 			pair.append(self.findInterpolatedPoint(A, B, targetz))
 
-		if (self.vertices[1].z > targetz and self.vertices[2].z < targetz) or (self.vertices[1].z < targetz and self.vertices[2].z > targetz):
+		if  (self.vertices[1].z -targetz)*(self.vertices[2].z - targetz) < 0:
 			# Calculate the coordinates of one segment at z = targetz (between v[1] and v[2])
 
 			A = (self.vertices[1].x, self.vertices[1].y, self.vertices[1].z)
 			B = (self.vertices[2].x, self.vertices[2].y, self.vertices[2].z)
 
 			pair.append(self.findInterpolatedPoint(A, B, targetz))
-
-		if self.vertices[0].z == targetz:
-			pair.append((self.vertices[0].x, self.vertices[0].y))
-		elif self.vertices[1].z == targetz:
-			pair.append((self.vertices[1].x, self.vertices[1].y))
-		elif self.vertices[2].z == targetz:
-			pair.append((self.vertices[2].x, self.vertices[2].y))
-
+        
+		for i in range(2):
+    			if self.vertices[i].z == targetz:
+    				pair.append((self.vertices[i].x, self.vertices[i].y))
 		return pair
 
 class Model3D(object):
@@ -249,7 +238,7 @@ class Model3D(object):
 			raise ValueError("You must provide a file.")
 
 		self.triangles = []
-		self.vertices = {}
+		self.vertices = {} 
 		self.normals = {}
 
 		self.name = ""
@@ -301,14 +290,14 @@ class Model3D(object):
 		normal_hash = norm.hash
 
 		if normal_hash not in self.normals:
-			self.normals[normal_hash] = norm
+			self.normals[normal_hash] = norm   
 		else:
 			triangle.norm = self.normals[normal_hash]
 
 		self.triangles.append(triangle)
 		self.update_extents(triangle)
 
-	def extents(self):
+	def extents(self):    
 		return ((self.xmin, self.xmax),
 				(self.ymin, self.ymax),
 				(self.zmin, self.zmax))
@@ -328,7 +317,7 @@ class Model3D(object):
 		if self.xmin == None:
 			self.xmin = self.xmax = triangle.vertices[0].x
 			self.ymin = self.ymax = triangle.vertices[0].y
-			self.zmin = self.zmax = triangle.vertices[0].z
+			self.zmin = self.zmax = triangle.vertices[0].z  
 
 			self.mx = 0.0
 			self.my = 0.0
@@ -370,7 +359,7 @@ class Model3D(object):
 				'x': {
 					'lower': self.xmin,
 					'upper': self.xmax,
-				},
+				}, 
 				'y': {
 					'lower': self.ymin,
 					'upper': self.ymax,
@@ -385,23 +374,43 @@ class Model3D(object):
 		}
 
 		return out
+    
+	def sort(self,):
+		print('Sorting')
+		self.minTri = sorted(list(range(len(self.triangles))), 
+		key = lambda x: min(self.triangles[x].vertices))
+		self.maxTri = sorted(list(range(len(self.triangles))),
+		key = lambda x: max(self.triangles[x].vertices))
 
+		self.buffer = {}
+		self.mindx = 0;
+		self.maxdx = 0;
+		print("finished")
+    
 	#@profile
 	def slice_at_z(self, targetz):
-		'''Function to slice the model at a certain z coordinate. Returns
-		an array of tuples, describing the various lines between points.'''
 		output = []
+		while min(self.triangles[self.minTri[self.mindx]].vertices).z < targetz:
+			self.buffer[self.minTri[self.mindx]] = self.triangles[self.minTri[self.mindx]]
+			self.mindx += 1
 
-		for triangle in self.triangles:
+
+		while max(self.triangles[self.maxTri[self.maxdx]].vertices).z < targetz:
+			del self.buffer[self.maxTri[self.maxdx]]
+			self.maxdx += 1
+            
+        # Can use this to check whether they render same targets
+		for triangle in self.triangles:# self.buffer.values():#
 			points = triangle.find_interpolated_points_at_z(targetz)
 
-			if len(points) == 2:
+			if len(points) == 2:	
 				output.append((points[0], points[1]))
+		
+		#print(len(output))
 
 		return output
 
 class STLModel(Model3D):
-
 	def __init__(self, f=None):
 		super(STLModel, self).__init__(f)
 
@@ -416,7 +425,6 @@ class STLModel(Model3D):
 
 	def process_bin(self, contents=None):
 		self.name, num_facets_1 = unpack(b"=80sI", contents[:84])
-
 		self.name = self.name.replace(b"solid", b"")
 		self.name = self.name.strip(b'\x00 \t\n\r')
 
@@ -475,3 +483,12 @@ class STLModel(Model3D):
 			
 			self.add_triangle(v1, v2, v3, norm)
 			del items[:21]
+            
+if __name__ == '__main__':
+    v1 = Vector3(1,2,3)
+    v2 = Vector3(3,4,5)
+    v3 = Vector3(2,3,4)
+    v4 = Vector3(0,0,0)
+    print(v1.cross(v1).length() == 0)
+    e1 = Edge(v1, v2)
+    e1.contains(v3)
