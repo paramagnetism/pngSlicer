@@ -382,7 +382,7 @@ class Model3D(object):
 		self.maxTri = sorted(list(range(len(self.triangles))),
 		key = lambda x: max(self.triangles[x].vertices))
 
-		self.buffer = {}
+		self.buffer = set()
 		self.mindx = 0;
 		self.maxdx = 0;
 		print("finished")
@@ -391,17 +391,19 @@ class Model3D(object):
 	def slice_at_z(self, targetz):
 		output = []
 		while min(self.triangles[self.minTri[self.mindx]].vertices).z < targetz:
-			self.buffer[self.minTri[self.mindx]] = self.triangles[self.minTri[self.mindx]]
+			self.buffer.add(self.minTri[self.mindx])
+			# self.buffer[self.minTri[self.mindx]] = self.triangles[self.minTri[self.mindx]]
 			self.mindx += 1
 
-
 		while max(self.triangles[self.maxTri[self.maxdx]].vertices).z < targetz:
-			del self.buffer[self.maxTri[self.maxdx]]
+			self.buffer.remove(self.maxTri[self.maxdx])
+			#del self.buffer[self.maxTri[self.maxdx]]
 			self.maxdx += 1
             
         # Can use this to check whether they render same targets
-		for triangle in self.triangles:# self.buffer.values():#
-			points = triangle.find_interpolated_points_at_z(targetz)
+		#for triangle in self.triangles:# 
+		for idx in self.buffer:
+			points = self.triangles[idx].find_interpolated_points_at_z(targetz)
 
 			if len(points) == 2:	
 				output.append((points[0], points[1]))
